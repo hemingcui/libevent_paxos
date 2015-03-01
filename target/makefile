@@ -26,6 +26,8 @@ endif
 
 -include ../makefile.defs
 
+LIBS += $(XTERN_ROOT)/obj/lib/libruntime.a -lstdc++ -lm -lboost_system -lpthread -lrt
+
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target

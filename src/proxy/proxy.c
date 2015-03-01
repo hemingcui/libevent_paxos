@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "tern/runtime/paxos-op-queue.h"
 
 static void* hack_arg=NULL;
 
@@ -193,6 +194,8 @@ static void do_action_connect(int data_size,void* data,void* arg){
         bufferevent_setcb(ret->p_s,server_side_on_read,NULL,server_side_on_err,ret);
         bufferevent_enable(ret->p_s,EV_READ|EV_PERSIST|EV_WRITE);
         bufferevent_socket_connect(ret->p_s,(struct sockaddr*)&proxy->sys_addr.s_addr,proxy->sys_addr.s_sock_len);
+        if (proxy->sched_with_dmt)
+          paxq_push_back(header->connection_id, header->counter, PAXQ_CONNECT);
     }else{
         debug_log("why there is an existing connection?\n");
     }
@@ -217,6 +220,8 @@ static void do_action_send(int data_size,void* data,void* arg){
             goto do_action_send_exit;
         }else{
             bufferevent_write(ret->p_s,msg->data,msg->data_size);
+            if (proxy->sched_with_dmt)
+              paxq_push_back(msg->header.connection_id, msg->header.counter, PAXQ_SEND);
         }
     }
 do_action_send_exit:
@@ -242,6 +247,8 @@ static void do_action_close(int data_size,void* data,void* arg){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
         }
+        if (proxy->sched_with_dmt)
+          paxq_push_back(msg->header.connection_id, msg->header.counter, PAXQ_CLOSE);
     }
     PROXY_LEAVE(proxy);
 do_action_close_exit:
@@ -638,6 +645,7 @@ proxy_node* proxy_init(int node_id,const char* start_mode,const char* config_pat
     proxy->action_period.tv_usec = 1000000;
     proxy->recon_period.tv_sec = 2;
     proxy->recon_period.tv_usec = 0;
+    proxy->sched_with_dmt = 0;
     proxy->p_self = pthread_self();
     if(proxy_read_config(proxy,config_path)){
         err_log("PROXY : Configuration File Reading Error.\n");
@@ -735,6 +743,10 @@ proxy_node* proxy_init(int node_id,const char* start_mode,const char* config_pat
         err_log("PROXY : Cannot Initialize Consensus Component.\n");
         goto proxy_exit_error;
     }
+
+    //Heming: init paxos queue shared memory with DMT.
+    if (proxy->sched_with_dmt)
+      paxq_open_shared_mem(node_id);
 
     //register signal handler
     //signal(SIGTERM,proxy_singnal_handler_sys);

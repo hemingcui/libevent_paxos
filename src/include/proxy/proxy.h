@@ -78,7 +78,9 @@ typedef struct proxy_node_t{
     struct timeval recon_period;
     //signal handler
     struct event* sig_handler;
-    // DMT part
+    // DMT part, option
+    int sched_with_dmt; 
+
     // in the loop of libevent logical, we must give a way to periodically
     // invoke our actively working function
     struct event* do_action;

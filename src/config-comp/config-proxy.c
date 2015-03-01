@@ -59,6 +59,10 @@ int proxy_read_config(struct proxy_node_t* cur_node,const char* config_path){
         if(config_setting_lookup_int64(proxy_global_config,"action_timeval_us",&temp)){
             cur_node->action_period.tv_usec = temp;
         }
+        int sched_with_dmt;
+        if(config_setting_lookup_int(proxy_global_config,"sched_with_dmt",&sched_with_dmt)){
+            cur_node->sched_with_dmt = sched_with_dmt;
+        }
     }
 
     config_setting_t *proxy_config = NULL;
