@@ -20,6 +20,8 @@
 #include "../util/common-header.h"
 #include "../consensus/consensus.h"
 #include "message.h"
+#include "../db/db-interface.h"
+#include "./replica.h"
 
 typedef struct peer_t{
     int peer_id;
@@ -37,8 +39,10 @@ typedef struct peer_t{
 }peer;
 
 typedef enum node_state_code_t{
-    NODE_ACTIVE=0,
-    NODE_INACTIVE=1,
+    NODE_ACTIVE=0, // normal state
+    NODE_INLELE=1, //in leader election, in this stage, we are still finding a new leader, and this state can be interrupted by 
+    NODE_POSTLELE=2,// a new leader is elected out, and we must wait for some post activities from the new leader, and in this stage, the node won't receive any ping msg, that is, the leader election process cannot be canceled now.
+    NODE_WAITFORSYNC=3, //lagged behind,wait for ping msg
 }node_state_code;
 
 typedef struct node_config_t{
@@ -55,20 +59,25 @@ typedef void (*msg_handler)(struct node_t*,struct bufferevent*,size_t);
 
 typedef struct node_t{
 
-    uint32_t node_id;
+    node_id_t node_id;
 
     int stat_log;
     int sys_log;
 
     view cur_view;
-    view_stamp highest_committed_view_stamp;
-
+    view_stamp highest_to_commit;
+    view_stamp highest_committed;
+    view_stamp highest_seen;
+    //leader election
     node_state_code state;
+    lele_mod* election_mod; 
+    //consensus component
+    struct consensus_component_t* consensus_comp;
+
+    // replica group
     struct sockaddr_in my_address;
     uint32_t group_size;
     peer* peer_pool;
-
-    struct consensus_component_t* consensus_comp;
 
     //config
     node_config config;
@@ -79,18 +88,20 @@ typedef struct node_t{
     msg_handler msg_cb;
     struct event* signal_handler;
     struct event* ev_leader_ping;
+    struct event* ev_expect_ping;
     struct event* ev_make_progress;
     struct timeval last_ping_msg;
 
     //databse part
     char* db_name;
+    db* db_ptr;
     FILE* sys_log_file;
 
     //database* my_db
 }node;
 
-struct node_t* system_initialize(int node_id,const char* start_mode,const char* config_path,const char* log_path,int deliver_mode,void(*user_cb)(int data_size,void* data,void* arg),void* db_ptr,void* arg);
-void system_run(struct node_t* replica);
-void system_exit(struct node_t* replica);
+//struct node_t* system_initialize(int node_id,const char* start_mode,const char* config_path,const char* log_path,int deliver_mode,void(*user_cb)(size_t data_size,void* data,void* arg),void* db_ptr,void* arg);
+//void system_run(struct node_t* replica);
+//void system_exit(struct node_t* replica);
 
 #endif

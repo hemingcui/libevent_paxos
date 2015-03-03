@@ -29,15 +29,15 @@ static void* hack_arg=NULL;
 static hk_t gen_key(nid_t,nc_t,sec_t);
 
 // consensus callback
-static void update_state(int,void*,void*);
-static void fake_update_state(int,void*,void*);
+static void update_state(size_t,void*,void*);
+static void fake_update_state(size_t,void*,void*);
 static void usage();
 
 static void proxy_do_action(int fd,short whaDB_t,void* arg);
-static void do_action_to_server(int data_size,void* data,void* arg);
-static void do_action_connect(int data_size,void* data,void* arg);
-static void do_action_send(int data_size,void* data,void* arg);
-static void do_action_close(int data_size,void* data,void* arg);
+static void do_action_to_server(size_t data_size,void* data,void* arg);
+static void do_action_connect(size_t data_size,void* data,void* arg);
+static void do_action_send(size_t data_size,void* data,void* arg);
+static void do_action_close(size_t data_size,void* data,void* arg);
 
 static void proxy_on_accept(struct evconnlistener* listener,evutil_socket_t
         fd,struct sockaddr *address,int socklen,void *arg);
@@ -123,7 +123,7 @@ static void real_do_action(proxy_node* proxy){
     PROXY_LEAVE(proxy);
 }
 
-static void do_action_to_server(int data_size,void* data,void* arg){
+static void do_action_to_server(size_t data_size,void* data,void* arg){
     
     proxy_node* proxy = arg;
     PROXY_ENTER(proxy);
@@ -174,7 +174,7 @@ static void do_action_to_server(int data_size,void* data,void* arg){
     return;
 }
 // when we have seen a connect method;
-static void do_action_connect(int data_size,void* data,void* arg){
+static void do_action_connect(size_t data_size,void* data,void* arg){
     
     proxy_node* proxy = arg;
     PROXY_ENTER(proxy);
@@ -206,7 +206,7 @@ static void do_action_connect(int data_size,void* data,void* arg){
 // when we have seen a send method,and since we have seen the same request
 // sequence on all the machine, then this time, we must have already set up the
 // connection with the server
-static void do_action_send(int data_size,void* data,void* arg){
+static void do_action_send(size_t data_size,void* data,void* arg){
     proxy_node* proxy = arg;
     PROXY_ENTER(proxy);
     proxy_send_msg* msg = data;
@@ -219,6 +219,7 @@ static void do_action_send(int data_size,void* data,void* arg){
         if(NULL==ret->p_s){
             goto do_action_send_exit;
         }else{
+            SYS_LOG(proxy, "Proxy sends request to the real server.\n");
             bufferevent_write(ret->p_s,msg->data,msg->data_size);
             if (proxy->sched_with_dmt)
               paxq_push_back_w_lock(msg->header.connection_id, msg->header.counter, PAXQ_SEND);
@@ -229,7 +230,7 @@ do_action_send_exit:
     return;
 }
 
-static void do_action_close(int data_size,void* data,void* arg){
+static void do_action_close(size_t data_size,void* data,void* arg){
     proxy_node* proxy = arg;
     proxy_close_msg* msg = data;
     PROXY_ENTER(proxy);
@@ -255,7 +256,7 @@ do_action_close_exit:
     return;
 }
 
-static void update_state(int data_size,void* data,void* arg){
+static void update_state(size_t data_size,void* data,void* arg){
     proxy_node* proxy = arg;
     PROXY_ENTER(proxy);
     //SYS_LOG(proxy,"In Update State,The Current Rec Is %lu.\n",*((db_key_type*)(data)));
@@ -278,7 +279,7 @@ static void wake_up(proxy_node* proxy){
 
 //fake update state, we take out the data directly without re-
 //visit the database
-static void fake_update_state(int data_size,void* data,void* arg){
+static void fake_update_state(size_t data_size,void* data,void* arg){
     proxy_node* proxy = arg;
     proxy_msg_header* header = data;
     FILE* output = proxy->req_log_file;
@@ -333,7 +334,7 @@ void consensus_on_event(struct bufferevent* bev,short ev,void* arg){
         SYS_LOG(proxy,"Connected to Consensus.\n");
     }else if((ev & BEV_EVENT_EOF )||(ev&BEV_EVENT_ERROR)){
         int err = EVUTIL_SOCKET_ERROR();
-		SYS_LOG(proxy,"%s.\n",evutil_socket_error_to_string(err));
+		    SYS_LOG(proxy,"%s.\n",evutil_socket_error_to_string(err));
         bufferevent_free(bev);
         proxy->con_conn = NULL;
         event_add(proxy->re_con,&proxy->recon_period);
@@ -464,7 +465,7 @@ static void client_side_on_read(struct bufferevent* bev,void* arg){
         header = (client_msg_header*)malloc(CLIENT_MSG_HEADER_SIZE);
         if(NULL==header){return;}
         evbuffer_copyout(input,header,CLIENT_MSG_HEADER_SIZE);
-        int data_size = header->data_size;
+        size_t data_size = header->data_size;
         if(len>=(CLIENT_MSG_HEADER_SIZE+data_size)){
            client_process_data(pair,bev,data_size); 
         }else{
@@ -626,7 +627,7 @@ static void proxy_signal_term(evutil_socket_t fid,short what,void* arg){
     return;
 }
 
-proxy_node* proxy_init(int node_id,const char* start_mode,const char* config_path,
+proxy_node* proxy_init(node_id_t node_id,const char* start_mode,const char* config_path,
         const char* log_path,int fake_mode){
     
 
@@ -658,7 +659,11 @@ proxy_node* proxy_init(int node_id,const char* start_mode,const char* config_pat
     }
     
     // set up base
-	struct event_base* base = event_base_new();
+    // Enable libevent debugging mode for 
+    // 1. Uninitialize events
+    // 2. Reinitialize a pending struct event 
+    /*event_enable_debug_mode();*/
+	  struct event_base* base = event_base_new();
 
     if(NULL==base){
         goto proxy_exit_error;
@@ -736,7 +741,7 @@ proxy_node* proxy_init(int node_id,const char* start_mode,const char* config_pat
                 config_path,log_path,1,fake_update_state,proxy->db_ptr,proxy);
     }else{
         proxy->con_node = system_initialize(node_id,start_mode,
-                config_path,log_path,0,update_state,NULL,proxy);
+                config_path,log_path,0,update_state,proxy->db_ptr,proxy);
     }
 
     if(NULL==proxy->con_node){
