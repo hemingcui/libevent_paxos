@@ -5,7 +5,7 @@
 -include ../makefile.init
 
 RM := rm -rf
-
+export GPROF
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include src/util/subdir.mk
@@ -36,8 +36,9 @@ all: server.out
 # Tool invocations
 server.out: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
-	@echo 'Invoking: GCC C Linker'
-	gcc-4.8  -Wall -pg -o   "server.out"  -L"$(ROOT_DIR)/../.local/lib" -pthread  $(OBJS) $(USER_OBJS) $(LIBS)
+	@echo 'Invoking: GCC C Linker: $(GPROF)'
+	#gcc-4.8  -Wall -pg -o   "server.out"  -L"$(ROOT_DIR)/../.local/lib" -pthread  $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc-4.8 -Wall $(GPROF) -o "server.out" -L"$(ROOT_DIR)/../.local/lib" -pthread  $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
