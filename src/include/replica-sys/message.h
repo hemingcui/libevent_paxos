@@ -19,6 +19,7 @@
 #define MESSAGE_H
 
 #include "../util/common-header.h"
+#include "../leader-election/view_controller.h"
 
 typedef enum sys_msg_code_t{
     PING_REQ = 0,
@@ -29,6 +30,7 @@ typedef enum sys_msg_code_t{
     CONSENSUS_MSG = 5,
     CLIENT_SYNC_REQ = 11,
     CLIENT_SYNC_ACK = 12,
+    LEADER_ELECTION_MSG = 16,
 }sys_msg_code;
 
 typedef enum req_sub_code_t{
@@ -49,7 +51,7 @@ typedef struct sys_msg_header_t{
 
 typedef struct ping_req_msg_t{
     sys_msg_header header; 
-    int node_id;
+    node_id_t node_id;
     view view;
     struct timeval timestamp;
 }__attribute__((packed))ping_req_msg;
@@ -57,7 +59,7 @@ typedef struct ping_req_msg_t{
 
 typedef struct ping_ack_msg_t{
     sys_msg_header header; 
-    int node_id;
+    node_id_t node_id;
     view view;
     struct timeval timestamp;
 }__attribute__((packed))ping_ack_msg;
@@ -67,7 +69,7 @@ typedef struct request_submit_msg_t{
     sys_msg_header header; 
     char data[0];
 }__attribute__((packed))req_sub_msg;
-#define REQ_SUB_SIZE(M) (((M)->header.data_size)+sizeof(req_sub_msg))
+#define REQ_SUB_SIZE(M) (((M)->header.data_size)+sizeof(sys_msg_header))
 
 typedef struct request_submit_reply_msg_t{
     sys_msg_header header; 
@@ -97,7 +99,21 @@ typedef struct consensus_msg_t{
     sys_msg_header header;
     char data[0];
 }__attribute__((packed))consensus_msg;
-#define CONSENSUS_MSG_SIZE(M) (sizeof(sys_msg_header)+M->header.data_size)
+#define CONSENSUS_MSG_SIZE(M) (sizeof(sys_msg_header)+(M)->header.data_size)
+
+typedef struct leader_election_msg_t{
+    sys_msg_header header;
+    lele_msg vc_msg;
+}__attribute__((packed))leader_election_msg;
+#define LEADER_ELECTION_MSG_SIZE (sizeof(leader_election_msg))
+
+typedef struct leader_election_edge_msg_t{
+    sys_msg_header header;
+    lele_msg vc_msg;
+    char data[0];
+}__attribute__((packed))lele_edge_msg;
+#define LEADER_ELECTION_EDGE_MSG_SIZE(M) (sizeof(sys_msg_header)+(M)->header.data_size)
+
 
 //sys_msg* package_sys_msg(sys_msg_code,int,void*);
 
@@ -106,5 +122,6 @@ void* build_ping_req(int,view*);
 void* build_ping_ack(int,view*);
 void* build_client_sync_ack(view*);
 void* build_request_submit_reply_msg(req_sub_code,view_stamp*);
+void* build_lele_msg(node_id_t node_id,lele_mod* mod,lele_msg_type type,void* arg);
 
 #endif
