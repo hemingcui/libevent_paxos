@@ -22,6 +22,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "tern/runtime/paxos-op-queue.h"
+ #include <netinet/in.h>
+#include <netinet/tcp.h>
 
 static void* hack_arg=NULL;
 
@@ -352,10 +354,18 @@ void consensus_on_event(struct bufferevent* bev,short ev,void* arg){
 //void consensus_on_read(struct bufferevent* bev,void*);
 void connect_consensus(proxy_node* proxy){
     
-    proxy->con_conn = bufferevent_socket_new(proxy->base,-1,BEV_OPT_CLOSE_ON_FREE);
+    evutil_socket_t fd;
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    proxy->con_conn = bufferevent_socket_new(proxy->base,fd,BEV_OPT_CLOSE_ON_FREE);
+
+    // proxy->con_conn = bufferevent_socket_new(proxy->base,-1,BEV_OPT_CLOSE_ON_FREE);
     bufferevent_setcb(proxy->con_conn,NULL,NULL,consensus_on_event,proxy);
     bufferevent_enable(proxy->con_conn,EV_READ|EV_WRITE|EV_PERSIST);
     bufferevent_socket_connect(proxy->con_conn,(struct sockaddr*)&proxy->sys_addr.c_addr,proxy->sys_addr.c_sock_len);
+
+    int enable = 1;
+    if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)) < 0)
+        printf("TCP_NODELAY SETTING ERROR!\n");
     
     return;
 }
@@ -575,6 +585,11 @@ static void proxy_on_accept(struct evconnlistener* listener,evutil_socket_t
         new_conn->proxy = proxy;
         bufferevent_setcb(new_conn->p_c,client_side_on_read,NULL,client_side_on_err,new_conn);
         bufferevent_enable(new_conn->p_c,EV_READ|EV_PERSIST|EV_WRITE);
+
+        int enable = 1;
+        if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)) < 0)
+            printf("Proxy-side new_conn->p_c: TCP_NODELAY SETTING ERROR!\n");
+
         MY_HASH_SET(new_conn,proxy->hash_map);
         // connect operation should be consistent among all the proxies.
         struct timeval recv_time;

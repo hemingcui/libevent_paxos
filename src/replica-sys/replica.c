@@ -1,6 +1,8 @@
 #include "../include/util/common-header.h"
 #include "../include/replica-sys/node.h"
 #include "../include/config-comp/config-comp.h"
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/stat.h>
 
 #define forlessp(var,start,end) for((var) = (start);(var)<(end);(var)++)
@@ -177,11 +179,19 @@ static void peer_node_on_event(struct bufferevent* bev,short ev,void* arg){
 static void connect_peer(peer* peer_node){
     DEBUG_ENTER
     node* my_node = peer_node->my_node;
-    peer_node->my_buff_event = bufferevent_socket_new(peer_node->base,-1,BEV_OPT_CLOSE_ON_FREE);
+
+    evutil_socket_t fd;
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    peer_node->my_buff_event = bufferevent_socket_new(peer_node->base,fd,BEV_OPT_CLOSE_ON_FREE);
+
+    //peer_node->my_buff_event = bufferevent_socket_new(peer_node->base,-1,BEV_OPT_CLOSE_ON_FREE);
     bufferevent_setcb(peer_node->my_buff_event,peer_node_on_read,NULL,peer_node_on_event,peer_node);
     bufferevent_enable(peer_node->my_buff_event,EV_READ|EV_WRITE|EV_PERSIST);
-    bufferevent_socket_connect(peer_node->my_buff_event,(struct sockaddr*)peer_node->peer_address,
-      peer_node->sock_len);
+    bufferevent_socket_connect(peer_node->my_buff_event,(struct sockaddr*)peer_node->peer_address,peer_node->sock_len);
+
+    int enable = 1;
+    if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)) < 0)
+        printf("Peers-side: TCP_NODELAY SETTING ERROR!\n");
 
     DEBUG_LEAVE
     CHECK_EXIT;
@@ -503,6 +513,10 @@ static void replica_on_error_cb(struct bufferevent* bev, short error, void *arg)
 }
 
 static void replica_on_accept(struct evconnlistener* listener,evutil_socket_t fd,struct sockaddr *address,int socklen,void *arg){
+    int enable = 1;
+    if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)) < 0)
+        printf("Consensus-side: TCP_NODELAY SETTING ERROR!\n");
+
     node* my_node = arg;
     SYS_LOG(my_node, "A New Connection Is Established.\n");
     struct bufferevent* new_buff_event = bufferevent_socket_new(my_node->base,fd,
