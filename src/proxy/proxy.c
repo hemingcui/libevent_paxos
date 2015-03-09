@@ -199,7 +199,7 @@ static void do_action_connect(size_t data_size,void* data,void* arg){
         if (proxy->sched_with_dmt) {
           unsigned port = (unsigned)ntohs(proxy->sys_addr.s_addr.sin_port);
           fprintf(stderr, "Proxy pself %u connects server port %u\n", (unsigned)pthread_self(), port);
-          paxq_push_back_w_lock(header->connection_id, header->counter, PAXQ_CONNECT, port);
+          paxq_push_back(1, header->connection_id, header->counter, PAXQ_CONNECT, port);
         }
     }else{
         debug_log("why there is an existing connection?\n");
@@ -227,7 +227,7 @@ static void do_action_send(size_t data_size,void* data,void* arg){
             SYS_LOG(proxy, "Proxy sends request to the real server.\n");
             bufferevent_write(ret->p_s,msg->data,msg->data_size);
             if (proxy->sched_with_dmt) {
-              paxq_push_back_w_lock(msg->header.connection_id, msg->header.counter, PAXQ_SEND, 0);
+              paxq_push_back(1, msg->header.connection_id, msg->header.counter, PAXQ_SEND, 0);
               fprintf(stderr, "Proxy pself %u sends %u bytes on on connection id %lld\n",
                 (unsigned)pthread_self(), (unsigned)msg->data_size, (long long)msg->header.connection_id);
             }
@@ -257,7 +257,7 @@ static void do_action_close(size_t data_size,void* data,void* arg){
             ret->p_c = NULL;
         }
         if (proxy->sched_with_dmt)
-          paxq_push_back_w_lock(msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
+          paxq_push_back(1, msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
     }
     PROXY_LEAVE(proxy);
 do_action_close_exit:

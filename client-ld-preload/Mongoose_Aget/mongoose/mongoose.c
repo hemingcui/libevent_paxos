@@ -1514,6 +1514,7 @@ static int wait_until_socket_is_readable(struct mg_connection *conn) {
     pfd.fd = conn->client.sock;
     pfd.events = POLLIN;
     result = poll(&pfd, 1, 200);
+    gettimeofday(&tend, NULL);
     if (result == 0 && conn->ssl != NULL) {
       result = SSL_pending(conn->ssl);
     }
