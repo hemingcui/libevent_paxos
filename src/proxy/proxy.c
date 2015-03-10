@@ -198,7 +198,7 @@ static void do_action_connect(size_t data_size,void* data,void* arg){
         bufferevent_socket_connect(ret->p_s,(struct sockaddr*)&proxy->sys_addr.s_addr,proxy->sys_addr.s_sock_len);
         if (proxy->sched_with_dmt) {
           unsigned port = (unsigned)ntohs(proxy->sys_addr.s_addr.sin_port);
-          fprintf(stderr, "Proxy pself %u connects server port %u\n", (unsigned)pthread_self(), port);
+          //fprintf(stderr, "Proxy pself %u connects server port %u\n", (unsigned)pthread_self(), port);
           paxq_push_back(1, header->connection_id, header->counter, PAXQ_CONNECT, port);
         }
     }else{
@@ -225,11 +225,16 @@ static void do_action_send(size_t data_size,void* data,void* arg){
             goto do_action_send_exit;
         }else{
             SYS_LOG(proxy, "Proxy sends request to the real server.\n");
+            if (proxy->sched_with_dmt)
+              paxq_lock();
             bufferevent_write(ret->p_s,msg->data,msg->data_size);
             if (proxy->sched_with_dmt) {
-              paxq_push_back(1, msg->header.connection_id, msg->header.counter, PAXQ_SEND, 0);
-              fprintf(stderr, "Proxy pself %u sends %u bytes on on connection id %lld\n",
-                (unsigned)pthread_self(), (unsigned)msg->data_size, (long long)msg->header.connection_id);
+              /** Push back without holding the lock within push_back. Make the 
+              paxq_push_back and the actual buffer event write atomic. **/
+              paxq_push_back(0, msg->header.connection_id, msg->header.counter, PAXQ_SEND, (unsigned)msg->data_size);
+              //fprintf(stderr, "Proxy pself %u sends %u bytes on on connection id %lld\n",
+                //(unsigned)pthread_self(), (unsigned)msg->data_size, (long long)msg->header.connection_id);
+              paxq_unlock();
             }
         }
     }
