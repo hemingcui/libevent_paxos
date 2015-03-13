@@ -106,6 +106,7 @@ typedef enum proxy_action_t{
     P_CONNECT=0,
     P_SEND=1,
     P_CLOSE=2,
+    P_DMT_CLKS =3,
 }proxy_action;
 
 typedef struct proxy_msg_header_t{
