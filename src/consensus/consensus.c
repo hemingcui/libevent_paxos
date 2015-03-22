@@ -193,6 +193,7 @@ int consensus_submit_request(struct consensus_component_t* comp,
     if(LEADER==comp->my_role){
        return leader_handle_submit_req(comp,data_size,data,vs);
     }else{
+        // Disable the forwarding ability of secondary
         /*return forward_submit_req(comp,data_size,data);*/
         return 0;
     }
