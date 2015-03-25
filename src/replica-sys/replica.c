@@ -339,8 +339,9 @@ static void make_progress_on(int fd,short what,void* arg){
     // at first check whether I am the leader
     if(my_node->cur_view.leader_id!=my_node->node_id){
         if(my_node->ev_make_progress!=NULL){
+            SYS_LOG(my_node, "Switch from leader to secondary.\n");
             event_free(my_node->ev_make_progress);
-            initialize_leader_make_progress(my_node);
+            initialize_expect_ping(my_node);
         }
         goto make_progress_on_exit;
     }
