@@ -1,5 +1,6 @@
 CC=gcc-4.8
 LIB_NAME="./libclilib.so"
+CFLAGS := -Wall -O2 -g -std=gnu11 -I../.local/include
 LDFLAGS=-lpthread -lrt -ldl
 
 target = libclilib.so.1.0 \

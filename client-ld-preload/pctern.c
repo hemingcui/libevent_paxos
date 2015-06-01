@@ -42,6 +42,7 @@
 #include <pthread.h>
 #include <execinfo.h> 
 #include "../src/include/rsm-interface.h"
+#include "config-client.h"
 
 #include "enter_sys.h"
 
@@ -59,11 +60,19 @@
 #define LD_DEBUG 1
 #endif
 
-static ssize_t (*fp_write)(int fd, const void *buf, size_t count);
+int inited = 0;
+
+#define INIT_CLIENT \
+  if (!inited) { \
+    client_read_config(); \
+    inited = 1; \
+  }
+
 
 static ssize_t (*fp_send)(int socket, const void *buffer, size_t length, int flags);
-
 ssize_t send(int socket, const void *buffer, size_t length, int flags){
+    INIT_CLIENT;
+    
     ssize_t ret =-1;
     if(!check_sys()){
 #if LD_DEBUG
@@ -102,7 +111,11 @@ ssize_t send(int socket, const void *buffer, size_t length, int flags){
     return ret;
 };
 
+
+static ssize_t (*fp_write)(int fd, const void *buf, size_t count);
 ssize_t write(int fd, const void *buf, size_t count){
+    INIT_CLIENT;
+    
     ssize_t ret =-1;
     struct stat st;
     int is_socket=0;
