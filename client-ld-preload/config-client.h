@@ -5,10 +5,13 @@
 #include <libconfig.h>
 
 
-int group_size = -1;
-peer* peer_pool = NULL;
+extern int client_read_config();
 
-int client_read_config();
+extern int get_group_size();
+
+extern char *get_node_ip(int node_id);
+
+extern int get_node_port(int node_id);
 
 #endif
 
