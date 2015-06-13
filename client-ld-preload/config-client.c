@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include "config-client.h"
 
-int group_size = -1;
-peer* peer_pool = NULL;
+int group_size;
+peer* peer_pool;
 
 //Init group size and peer_pool, get IPs.
 int client_read_config() {
@@ -50,11 +50,13 @@ int client_read_config() {
       peer_pool[i].peer_address->sin_port = htons(peer_port);
   }
 
+  config_destroy(&config_file);
   return 0;
 goto_config_error:
+  config_destroy(&config_file);
   return -1;
 }
-
+/*
 int get_group_size() {
   return group_size;
 }
@@ -67,5 +69,5 @@ char *get_node_ip(int node_id) {
 int get_node_port(int node_id) {
   assert(node_id >= 0 && node_id < group_size);
   return ntohs(peer_pool[node_id].peer_address->sin_port);
-}
+}*/
 
