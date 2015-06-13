@@ -10,6 +10,7 @@ peer* peer_pool;
 
 //Init group size and peer_pool, get IPs.
 int client_read_config() {
+  return 0; // Disable it for now. Do the testing framework first.
   char config_path[1024] = {0};
   const char *proj_root_path = getenv("MSMR_ROOT");
   sprintf(config_path, "%s/%s", proj_root_path, "libevent_paxos/target/nodes.local.cfg");
