@@ -640,7 +640,7 @@ static void proxy_timebubble_init(struct event_base* base, void *arg) {
     (struct sockaddr*)&server_address, sizeof(server_address));
    if (!ret)
      err_log("PROXY : Cannot Init the Socket for Time bubble.");
-  //chmod(sock_path, 0x777);
+  chmod(timebubble_sockpath, 0777);
   PROXY_LEAVE(proxy);
   return;
 }
