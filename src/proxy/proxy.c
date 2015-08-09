@@ -25,6 +25,8 @@
 #include "tern/runtime/paxos-op-queue.h"
  #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 
 static void* hack_arg=NULL;
 
@@ -50,6 +52,15 @@ static void consensus_on_read(struct bufferevent*,void*);
 static void connect_consensus(proxy_node*);
 static void reconnect_on_timeout(int fd,short what,void* arg);
 
+ /* For time bubble mechanism. */
+static void proxy_on_read_timebubble_req(struct bufferevent *bev, void *arg);
+static void proxy_on_timebubble_conn_err(struct bufferevent *bev, short events, void *arg);
+static void proxy_on_accept_timebubble_conn(struct evconnlistener* listener, evutil_socket_t
+        fd,struct sockaddr *address,int socklen,void *arg);
+static void proxy_timebubble_init(struct event_base* base, void *arg);
+static void proxy_invoke_timebubble_consensus(void *arg);
+static req_sub_msg* build_timebubble_req_sub_msg();
+
 
 //socket pair callback function
 
@@ -61,7 +72,6 @@ static void client_side_on_read(struct bufferevent* bev,void* arg);
 static void client_side_on_err(struct bufferevent* bev,short what,void* arg);
 
 static req_sub_msg* build_req_sub_msg(hk_t s_key,counter_t counter,int type,size_t data_size,void* data);
-static req_sub_msg* build_dmt_clks_req_sub_msg();
 
 static void wake_up(proxy_node* proxy);
 static void real_do_action(proxy_node* proxy);
@@ -555,13 +565,93 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
     return;
 }
 
-static void proxy_on_dmt_clks_req(void *arg){
+/* Accept a timebubble signal (connection) from DMT, invoke consensus, then 
+close this connection. */
+static void proxy_on_read_timebubble_req(struct bufferevent *bev, void *arg) {
+  proxy_node* proxy = arg;
+  PROXY_ENTER(proxy);
+  const int buf_len = 16;
+  char buf[buf_len];
+  memset(buf, 0, buf_len);
+  bufferevent_read(bev, buf, strlen(timebubble_tag));
+  if (!strcmp(buf, timebubble_tag)) {
+    paxq_lock();
+    if (paxq_size() > 0) {
+      paxos_op op = paxq_get_op(0);
+      if (op.type == PAXQ_NOP && op.value < 0)
+        proxy_invoke_timebubble_consensus(arg); // Proxy invokes a consensus request.
+    }
+    paxq_unlock();
+  }
+  PROXY_LEAVE(proxy);
+  return;
+}
+
+static void proxy_on_timebubble_conn_err(struct bufferevent *bev, short events, void *arg) {
+  proxy_node* proxy = arg;
+  PROXY_ENTER(proxy);
+  if (events & BEV_EVENT_ERROR)
+    perror("Error from bufferevent");
+  if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
+    fprintf(stderr, "%s: close the timebubble connection.\n", __FUNCTION__);
+    bufferevent_free(bev);
+  }
+  PROXY_LEAVE(proxy);
+  return;
+}
+
+static void proxy_on_accept_timebubble_conn(struct evconnlistener* listener,
+  evutil_socket_t fd,struct sockaddr *address,int socklen,void *arg) {
+  req_sub_msg* req_msg = NULL;
+  proxy_node* proxy = arg;
+  PROXY_ENTER(proxy);
+  if (!proxy->sched_with_dmt)
+    err_log("PROXY : sched_with_dmt disabled But Got Request. Something Is Wrong.");
+  struct bufferevent* ev = bufferevent_socket_new(proxy->base, fd, BEV_OPT_CLOSE_ON_FREE);
+  if (!ev) {
+    err_log("PROXY : Cannot Init the Socket Connection for Time bubble from DMT.");
+  } else {
+    bufferevent_setcb(ev, proxy_on_read_timebubble_req, NULL,
+      proxy_on_timebubble_conn_err, (void*)proxy);
+    bufferevent_enable(ev, EV_READ|EV_PERSIST|EV_WRITE);
+    int enable = 1;
+    if(setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, (void*)&enable, sizeof(enable)) < 0)
+      fprintf(stderr, "Proxy-side timebubble connection: TCP_NODELAY SETTING ERROR\n");
+    fprintf(stderr, "%s: set up the timebubble connection with sock %d.\n", __FUNCTION__, fd);
+  }
+  PROXY_LEAVE(proxy);
+  return;
+}
+
+/* Setup a call back to receive signal (connection) on timebubble requests from DMT. */
+static void proxy_timebubble_init(struct event_base* base, void *arg) {
+  int server_sockfd;
+  int server_len;
+  struct sockaddr_un server_address;
+  proxy_node* proxy = arg;
+  PROXY_ENTER(proxy);
+ 
+  unlink(timebubble_sockpath);
+  server_sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+  server_address.sun_family = AF_UNIX;
+  strcpy(server_address.sun_path, timebubble_sockpath);
+  struct evconnlistener *ret = evconnlistener_new_bind(base, proxy_on_accept_timebubble_conn,
+    arg, LEV_OPT_CLOSE_ON_FREE|LEV_OPT_REUSEABLE, -1,
+    (struct sockaddr*)&server_address, sizeof(server_address));
+   if (!ret)
+     err_log("PROXY : Cannot Init the Socket for Time bubble.");
+  //chmod(sock_path, 0x777);
+  PROXY_LEAVE(proxy);
+  return;
+}
+
+static void proxy_invoke_timebubble_consensus(void *arg){
   //fprintf(stderr, "proxy_on_dmt_clks_req pid %d tid PAXQ_NOP clock start\n", getpid());
   proxy_node* proxy = arg;
   PROXY_ENTER(proxy);
   struct timeval recv_time;
   gettimeofday(&recv_time,NULL);
-  req_sub_msg* clk_msg = build_dmt_clks_req_sub_msg();
+  req_sub_msg* clk_msg = build_timebubble_req_sub_msg();
   ((proxy_close_msg*)clk_msg->data)->header.received_time = recv_time;
   if(NULL!=clk_msg && NULL!=proxy->con_conn){
     bufferevent_write(proxy->con_conn,clk_msg,REQ_SUB_SIZE(clk_msg));
@@ -617,7 +707,7 @@ build_req_sub_msg_err_exit:
     return NULL;
 }
 
-static req_sub_msg* build_dmt_clks_req_sub_msg(){
+static req_sub_msg* build_timebubble_req_sub_msg(){
   req_sub_msg* msg = (req_sub_msg*)malloc(SYS_MSG_HEADER_SIZE+PROXY_CONNECT_MSG_SIZE);
   assert(msg);
   msg->header.type = REQUEST_SUBMIT;
@@ -694,15 +784,6 @@ static void proxy_singnal_handler(evutil_socket_t fid,short what,void* arg){
     sig = event_get_signal((proxy->sig_handler));
     SYS_LOG(proxy,"PROXY : GET SIGUSR2,Now Check Pending Requests.\n");
     real_do_action(proxy);
-    if (proxy->sched_with_dmt) {
-      paxq_lock();
-      if (paxq_size() > 0) {
-        paxos_op op = paxq_get_op(0);
-        if (op.type == PAXQ_NOP && op.value < 0)
-          proxy_on_dmt_clks_req(arg); // Proxy invokes a consensus request.
-      }
-      paxq_unlock();
-    }
     PROXY_LEAVE(proxy);
     return;
 }
@@ -846,8 +927,10 @@ proxy_node* proxy_init(node_id_t node_id,const char* start_mode,const char* conf
     }
 
     //Heming: init paxos queue shared memory with DMT.
-    if (proxy->sched_with_dmt)
+    if (proxy->sched_with_dmt) {
       paxq_open_shared_mem(node_id);
+      proxy_timebubble_init(proxy->base, proxy);
+    }
 
     //register signal handler
     //signal(SIGTERM,proxy_singnal_handler_sys);
