@@ -928,7 +928,7 @@ proxy_node* proxy_init(node_id_t node_id,const char* start_mode,const char* conf
 
     //Heming: init paxos queue shared memory with DMT.
     if (proxy->sched_with_dmt) {
-      paxq_open_shared_mem(node_id);
+      paxq_create_shared_mem();
       proxy_timebubble_init(proxy->base, proxy);
     }
 
