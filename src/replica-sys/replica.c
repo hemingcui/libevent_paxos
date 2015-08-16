@@ -1,3 +1,4 @@
+#include "../include/proxy/proxy.h"
 #include "../include/util/common-header.h"
 #include "../include/replica-sys/node.h"
 #include "../include/config-comp/config-comp.h"
@@ -288,6 +289,7 @@ static void leader_ping_period(int fd,short what,void* arg){
             event_add(my_node->ev_leader_ping,&my_node->config.ping_timeval);
         }
     }
+    paxq_update_role(my_node->node_id == my_node->cur_view.leader_id);
     DEBUG_LEAVE
     CHECK_EXIT
     return;
@@ -605,6 +607,7 @@ static void handle_ping_req(node* my_node,ping_req_msg* msg){
     }
   }
 handle_ping_req_exit:
+  paxq_update_role(my_node->node_id == my_node->cur_view.leader_id);
   DEBUG_LEAVE
   CHECK_EXIT
   return;
