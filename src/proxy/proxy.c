@@ -655,7 +655,7 @@ static void proxy_invoke_timebubble_consensus(void *arg){
   ((proxy_close_msg*)clk_msg->data)->header.received_time = recv_time;
   if(NULL!=clk_msg && NULL!=proxy->con_conn){
     bufferevent_write(proxy->con_conn,clk_msg,REQ_SUB_SIZE(clk_msg));
-    //free(clk_msg);
+    free(clk_msg);
   }
   PROXY_LEAVE(proxy);
   return;
