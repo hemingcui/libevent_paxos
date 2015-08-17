@@ -58,8 +58,8 @@ static void proxy_on_timebubble_conn_err(struct bufferevent *bev, short events, 
 static void proxy_on_accept_timebubble_conn(struct evconnlistener* listener, evutil_socket_t
         fd,struct sockaddr *address,int socklen,void *arg);
 static void proxy_timebubble_init(struct event_base* base, void *arg);
-static void proxy_invoke_timebubble_consensus(void *arg);
-static req_sub_msg* build_timebubble_req_sub_msg();
+static void proxy_invoke_timebubble_consensus(void *arg, int timebubble_cnt);
+static req_sub_msg* build_timebubble_req_sub_msg(int timebubble_cnt);
 
 
 //socket pair callback function
@@ -301,8 +301,9 @@ static void do_action_give_dmt_clocks(size_t data_size,void* data,void* arg){
     //(unsigned)pthread_self(), paxq_gettid());
   proxy_node* proxy = arg;
   PROXY_ENTER(proxy);
+  proxy_msg_header* header = data;
   assert(proxy->sched_with_dmt);
-  paxq_proxy_give_clocks();
+  paxq_proxy_give_clocks(header->counter);
   PROXY_LEAVE(proxy);
 }
 
@@ -592,14 +593,15 @@ static void proxy_on_read_timebubble_req(struct bufferevent *bev, void *arg) {
   fprintf(stderr, "Proxy receives timebubble request: %s:%d.\n", tag, cnt);
 
   if (!strcmp(tag, timebubble_tag)) {
-    paxq_lock();
-    assert(paxq_size() > 0 &&
+    /*paxq_lock();
+    (assert(paxq_size() > 0 &&
       "proxy_on_read_timebubble_req triggered, PAXQ must contain a timebubble");
     paxos_op op = paxq_get_op(0);
     assert(op.type == PAXQ_NOP && op.value < 0 &&
       "proxy_on_read_timebubble_req triggered, PAXQ head must be a timebubble");
-    proxy_invoke_timebubble_consensus(arg); // Proxy invokes a consensus request.
-    paxq_unlock();
+    proxy_invoke_timebubble_consensus(arg, cnt); // Proxy invokes a consensus request.
+    paxq_unlock();*/
+    proxy_invoke_timebubble_consensus(arg, cnt); // Proxy invokes a consensus request.
   } else {
     fprintf(stderr, "proxy_on_read_timebubble_req tag is not timebubble tag, wrong, exit...\n");
     exit(1);
@@ -666,13 +668,13 @@ static void proxy_timebubble_init(struct event_base* base, void *arg) {
   return;
 }
 
-static void proxy_invoke_timebubble_consensus(void *arg){
+static void proxy_invoke_timebubble_consensus(void *arg, int timebubble_cnt){
   //fprintf(stderr, "proxy_on_dmt_clks_req pid %d tid PAXQ_NOP clock start\n", getpid());
   proxy_node* proxy = arg;
   PROXY_ENTER(proxy);
   struct timeval recv_time;
   gettimeofday(&recv_time,NULL);
-  req_sub_msg* clk_msg = build_timebubble_req_sub_msg();
+  req_sub_msg* clk_msg = build_timebubble_req_sub_msg(timebubble_cnt);
   ((proxy_close_msg*)clk_msg->data)->header.received_time = recv_time;
   if(NULL!=clk_msg && NULL!=proxy->con_conn){
     bufferevent_write(proxy->con_conn,clk_msg,REQ_SUB_SIZE(clk_msg));
@@ -728,7 +730,7 @@ build_req_sub_msg_err_exit:
     return NULL;
 }
 
-static req_sub_msg* build_timebubble_req_sub_msg(){
+static req_sub_msg* build_timebubble_req_sub_msg(int timebubble_cnt){
   req_sub_msg* msg = (req_sub_msg*)malloc(SYS_MSG_HEADER_SIZE+PROXY_CONNECT_MSG_SIZE);
   assert(msg);
   msg->header.type = REQUEST_SUBMIT;
@@ -736,7 +738,8 @@ static req_sub_msg* build_timebubble_req_sub_msg(){
   proxy_connect_msg* co_msg = (void*)msg->data;
   co_msg->header.action = P_DMT_CLKS;
   co_msg->header.connection_id = 0;
-  co_msg->header.counter = 0;
+  co_msg->header.counter = timebubble_cnt; /* Heming: hack, use this as passing 
+                                         time bubble cnt, save the data field for time and heap space.*/
   gettimeofday(&co_msg->header.created_time,NULL);
   return msg;
 }
