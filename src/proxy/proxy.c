@@ -570,18 +570,39 @@ close this connection. */
 static void proxy_on_read_timebubble_req(struct bufferevent *bev, void *arg) {
   proxy_node* proxy = arg;
   PROXY_ENTER(proxy);
-  const int buf_len = 16;
+  /*const int buf_len = 16;
   char buf[buf_len];
   memset(buf, 0, buf_len);
-  bufferevent_read(bev, buf, strlen(timebubble_tag));
-  if (!strcmp(buf, timebubble_tag)) {
+  bufferevent_read(bev, buf, strlen(timebubble_tag));*/
+
+  // Read string from bufferevent.
+  const int buf_len = strlen(timebubble_tag) + timebubble_clk_len;
+  char buf[buf_len+1];
+  memset(buf, 0, buf_len+1);
+  bufferevent_read(bev, buf, buf_len+1);
+  fprintf(stderr, "Proxy receives timebubble buf (%s).\n", buf);
+
+  const int tag_len = strlen(timebubble_tag);
+  char tag[tag_len+1];
+  memset(tag, 0, tag_len+1);  
+  int cnt = 0;
+
+  assert(timebubble_clk_len == 8);
+  sscanf(buf, "%08d%s", &cnt, tag);
+  fprintf(stderr, "Proxy receives timebubble request: %s:%d.\n", tag, cnt);
+
+  if (!strcmp(tag, timebubble_tag)) {
     paxq_lock();
-    if (paxq_size() > 0) {
-      paxos_op op = paxq_get_op(0);
-      if (op.type == PAXQ_NOP && op.value < 0)
-        proxy_invoke_timebubble_consensus(arg); // Proxy invokes a consensus request.
-    }
+    assert(paxq_size() > 0 &&
+      "proxy_on_read_timebubble_req triggered, PAXQ must contain a timebubble");
+    paxos_op op = paxq_get_op(0);
+    assert(op.type == PAXQ_NOP && op.value < 0 &&
+      "proxy_on_read_timebubble_req triggered, PAXQ head must be a timebubble");
+    proxy_invoke_timebubble_consensus(arg); // Proxy invokes a consensus request.
     paxq_unlock();
+  } else {
+    fprintf(stderr, "proxy_on_read_timebubble_req tag is not timebubble tag, wrong, exit...\n");
+    exit(1);
   }
   PROXY_LEAVE(proxy);
   return;
