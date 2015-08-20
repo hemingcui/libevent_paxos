@@ -215,6 +215,7 @@ static void do_action_connect(size_t data_size,void* data,void* arg){
         bufferevent_setcb(ret->p_s,server_side_on_read,NULL,server_side_on_err,ret);
         bufferevent_enable(ret->p_s,EV_READ|EV_PERSIST|EV_WRITE);
         bufferevent_socket_connect(ret->p_s,(struct sockaddr*)&proxy->sys_addr.s_addr,proxy->sys_addr.s_sock_len);
+        fprintf(stderr, "Proxy sets up socket connection with server application.\n");
         if (proxy->sched_with_dmt) {
           paxq_lock();
           // Update whether current node is leader at each "connect". Just a hint, and paxos will ensure consistency.
@@ -477,6 +478,7 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             free(close_msg);
         }
     }
+    fprintf(stderr, "Proxy closes socket connection with server application.\n");
     PROXY_LEAVE(proxy);
     return;
 }
