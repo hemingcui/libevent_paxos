@@ -438,6 +438,7 @@ static void server_side_on_read(struct bufferevent* bev,void* arg){
     int cur_len = 0;
     void* msg = NULL;
     len = evbuffer_get_length(input);
+    fprintf(stderr, "Proxy receives %u bytes from server application.\n", (unsigned)len);
     SYS_LOG(proxy,"There Is %u Bytes Data In The Buffer In Total.\n",
             (unsigned)len);
     // every time we just send 1024 bytes data to the client
