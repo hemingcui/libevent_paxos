@@ -287,14 +287,14 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
         server_side_on_err() and client_side_on_err().*/
-        if(ret->p_s!=NULL){
+        /*if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
         }
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
-        }
+        }*/
         if (proxy->sched_with_dmt) {
           paxq_lock();
           paxq_push_back(0, msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
