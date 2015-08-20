@@ -286,7 +286,7 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         between proxy and server application will be closed even before the 
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
-        server_side_on_err() and client_side_on_err().
+        server_side_on_err() and client_side_on_err().*/
         if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
@@ -294,7 +294,7 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
-        }*/
+        }
         if (proxy->sched_with_dmt) {
           paxq_lock();
           paxq_push_back(0, msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
@@ -488,10 +488,10 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        if(pair->p_s != NULL){// Heming: must put the free here, refer to comments in do_action_close()
+        /*if(pair->p_s != NULL){// Heming: must put the free here, refer to comments in do_action_close()
             bufferevent_free(pair->p_s);
             //pair->p_s = NULL;
-        }
+        }*/
     }
     PROXY_LEAVE(proxy);
     return;
@@ -578,10 +578,10 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        if(pair->p_c != NULL){// Heming: must put the free here, refer to comments in do_action_close().
+        /*if(pair->p_c != NULL){// Heming: must put the free here, refer to comments in do_action_close().
             bufferevent_free(pair->p_c);
             //pair->p_c = NULL;
-        }
+        }*/
     }
     PROXY_LEAVE(proxy);
     return;
