@@ -470,6 +470,8 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
     if(what & BEV_EVENT_CONNECTED){
         SYS_LOG(proxy,"Connection Has Established Between %lu And The Real Server.\n",pair->key);
     }else if((what & BEV_EVENT_EOF) || ( what & BEV_EVENT_ERROR)){
+        fprintf(stderr, "Proxy closes socket connection with server application %d %d.\n",
+          what & BEV_EVENT_EOF, what & BEV_EVENT_ERROR);
         gettimeofday(&recv_time,NULL);
         req_sub_msg* close_msg = build_req_sub_msg(pair->key,pair->counter++,P_CLOSE,0,NULL);
         ((proxy_close_msg*)close_msg->data)->header.received_time = recv_time;
@@ -478,7 +480,6 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             free(close_msg);
         }
     }
-    fprintf(stderr, "Proxy closes socket connection with server application.\n");
     PROXY_LEAVE(proxy);
     return;
 }
