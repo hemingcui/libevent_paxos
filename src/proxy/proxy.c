@@ -488,10 +488,10 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        /*if(pair->p_s != NULL){// Heming: must put the free here, refer to comments in do_action_close()
+        if(pair->p_s != NULL){// Heming: must put the free here, refer to comments in do_action_close()
             bufferevent_free(pair->p_s);
-            //pair->p_s = NULL;
-        }*/
+            pair->p_s = NULL;
+        }
     }
     PROXY_LEAVE(proxy);
     return;
@@ -578,10 +578,10 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        /*if(pair->p_c != NULL){// Heming: must put the free here, refer to comments in do_action_close().
+        if(pair->p_c != NULL){// Heming: must put the free here, refer to comments in do_action_close().
             bufferevent_free(pair->p_c);
-            //pair->p_c = NULL;
-        }*/
+            pair->p_c = NULL;
+        }
     }
     PROXY_LEAVE(proxy);
     return;
