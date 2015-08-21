@@ -285,11 +285,11 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         between proxy and server application will be closed even before the 
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
-        server_side_on_err() and client_side_on_err().*/
-        if(ret->p_s!=NULL){
+        server_side_on_err() and client_side_on_err(). do_action_close(). */
+        /*if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
-        }
+        }*/
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
@@ -492,12 +492,29 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-        /*if(pair->p_s != NULL){
+        if(pair->p_s != NULL){
+            /*struct evbuffer* s_in = bufferevent_get_input(pair->p_s);
+            unsigned len_in = evbuffer_get_length(s_in);
+            struct evbuffer* c_out = bufferevent_get_output(pair->p_c);
+            unsigned len_out = evbuffer_get_length(c_out);*/
+            /*fprintf(stderr, "Proxy closes conn (%lu) with server application, len server in out %u %u, client in out %u %u\n",
+              (unsigned long)pair->key,
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_s)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_s)),
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_c)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_c)));*/
+            //evbuffer_add_buffer(c_out, s_in);
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
         }
-        if(pair->p_c != NULL){
-            bufferevent_flush(pair->p_c, EV_WRITE|EV_READ|EV_PERSIST, BEV_FLUSH);
+        /*if(pair->p_c != NULL){
+            fprintf(stderr, "Proxy closes conn with client application, len client in %u, client out %u\n",
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_c)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_c)));
+            bufferevent_flush(pair->p_c, EV_WRITE, BEV_FLUSH);
+            fprintf(stderr, "Proxy closes conn with client application flushed, len client in %u, client out %u\n",
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_c)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_c)));
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
         }*/
@@ -592,11 +609,16 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-        /*if(pair->p_c != NULL){
+        if(pair->p_c != NULL){
+            /*fprintf(stderr, "Proxy closes conn with CLIENT FIRST application, len server in out %u %u, client in out %u %u\n",
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_s)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_s)),
+              (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_c)),
+              (unsigned)evbuffer_get_length(bufferevent_get_output(pair->p_c)));*/
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
         }
-        if(pair->p_s != NULL){
+        /*if(pair->p_s != NULL){
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
         }*/
