@@ -286,14 +286,14 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
         server_side_on_err() and client_side_on_err().*/
-        /*if(ret->p_s!=NULL){
+        if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
         }
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
-        }*/
+        }
         if (proxy->sched_with_dmt) {
           paxq_lock();
           paxq_push_back(0, msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
@@ -492,14 +492,14 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-        if(pair->p_c != NULL){
+        /*if(pair->p_c != NULL){
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
         }
         if(pair->p_s != NULL){
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
-        }
+        }*/
     }
     PROXY_LEAVE(proxy);
     return;
@@ -591,14 +591,14 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-        if(pair->p_c != NULL){
+        /*if(pair->p_c != NULL){
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
         }
         if(pair->p_s != NULL){
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
-        }
+        }*/
     }
     PROXY_LEAVE(proxy);
     return;
