@@ -286,10 +286,10 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
         server_side_on_err() and client_side_on_err(). do_action_close(). */
-        if(ret->p_s!=NULL){
+        /*if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
-        }
+        }*/
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
@@ -447,7 +447,7 @@ static void server_side_on_read(struct bufferevent* bev,void* arg){
     int cur_len = 0;
     void* msg = NULL;
     len = evbuffer_get_length(input);
-    SYS_LOG(proxy, "Proxy receives %u bytes from server application, connection id %lu.\n",
+    fprintf(stderr, "Proxy receives %u bytes from server application, connection id %lu.\n",
       (unsigned)len, (unsigned long)pair->key);
     SYS_LOG(proxy, "There Is %u Bytes Data In The Buffer In Total.\n",
             (unsigned)len);
@@ -492,7 +492,7 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-#if 0
+#if 1
         if(pair->p_s != NULL){
             /*struct evbuffer* s_in = bufferevent_get_input(pair->p_s);
             unsigned len_in = evbuffer_get_length(s_in);
@@ -611,7 +611,7 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
         proxy <-> client, whenever the server side is closed, client side 
         should also be closed (in case some clients do not call close() 
         explicitly). must put the free here, refer to comments in do_action_close(). */
-#if 0
+#if 1
         if(pair->p_c != NULL){
             /*fprintf(stderr, "Proxy closes conn with CLIENT FIRST application, len server in out %u %u, client in out %u %u\n",
               (unsigned)evbuffer_get_length(bufferevent_get_input(pair->p_s)),
