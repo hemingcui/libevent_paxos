@@ -57,7 +57,7 @@
 #endif
 
 #ifndef LD_DEBUG
-#define LD_DEBUG 1
+#define LD_DEBUG 0
 #endif
 
 int inited = 0;
