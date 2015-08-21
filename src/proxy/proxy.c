@@ -215,7 +215,7 @@ static void do_action_connect(size_t data_size,void* data,void* arg){
         bufferevent_setcb(ret->p_s,server_side_on_read,NULL,server_side_on_err,ret);
         bufferevent_enable(ret->p_s,EV_READ|EV_PERSIST|EV_WRITE);
         bufferevent_socket_connect(ret->p_s,(struct sockaddr*)&proxy->sys_addr.s_addr,proxy->sys_addr.s_sock_len);
-        fprintf(stderr, "Proxy sets up socket connection with server application.\n");
+        SYS_LOG(proxy, "Proxy sets up socket connection (id %lu) with server application.\n", (unsigned long)ret->key);
         if (proxy->sched_with_dmt) {
           paxq_lock();
           // Update whether current node is leader at each "connect". Just a hint, and paxos will ensure consistency.
@@ -286,14 +286,14 @@ static void do_action_close(size_t data_size,void* data,void* arg){
         server sends back any responses. This may cause servers to diverge.
         Correct fix: put these free() in each socket connection's error handler 
         server_side_on_err() and client_side_on_err().*/
-        if(ret->p_s!=NULL){
+        /*if(ret->p_s!=NULL){
             bufferevent_free(ret->p_s);
             ret->p_s = NULL;
         }
         if(ret->p_c!=NULL){
             bufferevent_free(ret->p_c);
             ret->p_c = NULL;
-        }
+        }*/
         if (proxy->sched_with_dmt) {
           paxq_lock();
           paxq_push_back(0, msg->header.connection_id, msg->header.counter, PAXQ_CLOSE, 0);
@@ -447,8 +447,9 @@ static void server_side_on_read(struct bufferevent* bev,void* arg){
     int cur_len = 0;
     void* msg = NULL;
     len = evbuffer_get_length(input);
-    fprintf(stderr, "Proxy receives %u bytes from server application.\n", (unsigned)len);
-    SYS_LOG(proxy,"There Is %u Bytes Data In The Buffer In Total.\n",
+    SYS_LOG(proxy, "Proxy receives %u bytes from server application, connection id %lu.\n",
+      (unsigned)len, (unsigned long)pair->key);
+    SYS_LOG(proxy, "There Is %u Bytes Data In The Buffer In Total.\n",
             (unsigned)len);
     // every time we just send 1024 bytes data to the client
     // max_length_to_be_added
@@ -478,8 +479,8 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
     if(what & BEV_EVENT_CONNECTED){
         SYS_LOG(proxy,"Connection Has Established Between %lu And The Real Server.\n",pair->key);
     }else if((what & BEV_EVENT_EOF) || ( what & BEV_EVENT_ERROR)){
-        fprintf(stderr, "Proxy closes socket connection with server application %d %d.\n",
-          what & BEV_EVENT_EOF, what & BEV_EVENT_ERROR);
+        SYS_LOG(proxy, "Proxy closes socket connection with server application %d %d, connection id %lu.\n",
+          what & BEV_EVENT_EOF, what & BEV_EVENT_ERROR, (unsigned long)pair->key);
         gettimeofday(&recv_time,NULL);
         req_sub_msg* close_msg = build_req_sub_msg(pair->key,pair->counter++,P_CLOSE,0,NULL);
         ((proxy_close_msg*)close_msg->data)->header.received_time = recv_time;
@@ -487,10 +488,18 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        /*if(pair->p_s != NULL){// Heming: must put the free here, refer to comments in do_action_close()
+        /* Heming: since this is a socket pair beween proxy <-> server, and 
+        proxy <-> client, whenever the server side is closed, client side 
+        should also be closed (in case some clients do not call close() 
+        explicitly). must put the free here, refer to comments in do_action_close(). */
+        if(pair->p_c != NULL){
+            bufferevent_free(pair->p_c);
+            pair->p_c = NULL;
+        }
+        if(pair->p_s != NULL){
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
-        }*/
+        }
     }
     PROXY_LEAVE(proxy);
     return;
@@ -568,8 +577,9 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
     struct timeval recv_time;
     if(what&BEV_EVENT_CONNECTED){
         SYS_LOG(proxy,"Client %lu Connects.\n",pair->key);
-
     }else if((what & BEV_EVENT_EOF) || ( what & BEV_EVENT_ERROR)){
+        SYS_LOG(proxy, "Proxy closes socket connection (id: %lu) with client application %d %d.\n",
+          (unsigned long)pair->key, what & BEV_EVENT_EOF, what & BEV_EVENT_ERROR);
         gettimeofday(&recv_time,NULL);
         req_sub_msg* close_msg = build_req_sub_msg(pair->key,pair->counter++,P_CLOSE,0,NULL);
         ((proxy_close_msg*)close_msg->data)->header.received_time = recv_time;
@@ -577,10 +587,18 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
-        /*if(pair->p_c != NULL){// Heming: must put the free here, refer to comments in do_action_close().
+        /* Heming: since this is a socket pair beween proxy <-> server, and 
+        proxy <-> client, whenever the server side is closed, client side 
+        should also be closed (in case some clients do not call close() 
+        explicitly). must put the free here, refer to comments in do_action_close(). */
+        if(pair->p_c != NULL){
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
-        }*/
+        }
+        if(pair->p_s != NULL){
+            bufferevent_free(pair->p_s);
+            pair->p_s = NULL;
+        }
     }
     PROXY_LEAVE(proxy);
     return;
