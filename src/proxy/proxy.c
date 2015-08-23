@@ -487,6 +487,7 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
+#if 1
         if(pair->p_s != NULL){ /* Mechanism: do_action_close(). */
             /*fprintf(stderr, "Proxy closes conn (%lu) with server application, len server in out %u %u, client in out %u %u\n",
               (unsigned long)pair->key,
@@ -497,6 +498,7 @@ static void server_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_free(pair->p_s);
             pair->p_s = NULL;
         }
+#endif
     }
     PROXY_LEAVE(proxy);
     return;
@@ -584,10 +586,12 @@ static void client_side_on_err(struct bufferevent* bev,short what,void* arg){
             bufferevent_write(proxy->con_conn,close_msg,REQ_SUB_SIZE(close_msg));
             free(close_msg);
         }
+#if 1
         if(pair->p_c != NULL){/* Mechanism: do_action_close(). */
             bufferevent_free(pair->p_c);
             pair->p_c = NULL;
         }
+#endif
     }
     PROXY_LEAVE(proxy);
     return;
